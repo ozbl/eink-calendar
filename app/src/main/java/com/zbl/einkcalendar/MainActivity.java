@@ -13,6 +13,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
@@ -89,6 +90,28 @@ public class MainActivity extends Activity implements DashboardView.Listener {
             }
         }
     };
+
+    private final BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updateBattery(intent);
+        }
+    };
+
+    /** Reads level/charging from the sticky ACTION_BATTERY_CHANGED broadcast. */
+    private void updateBattery(Intent intent) {
+        if (intent == null || dashboard == null) {
+            return;
+        }
+        int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        int percent = (level >= 0 && scale > 0)
+                ? Math.round(level * 100f / scale) : -1;
+        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+        boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                || status == BatteryManager.BATTERY_STATUS_FULL;
+        dashboard.setBattery(percent, charging);
+    }
 
     /**
      * Last line of defence: some vendor power services switch the panel off
@@ -191,6 +214,8 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         handler.post(ticker);
         IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(connectivityReceiver, filter);
+        registerReceiver(batteryReceiver,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         if (!screenReceiverRegistered) {
             registerReceiver(screenReceiver, new IntentFilter(Intent.ACTION_SCREEN_OFF));
             screenReceiverRegistered = true;
@@ -220,6 +245,10 @@ public class MainActivity extends Activity implements DashboardView.Listener {
             screenReceiverRegistered = false;
         }
         releaseScreenLock();
+        try {
+            unregisterReceiver(batteryReceiver);
+        } catch (Exception ignored) {
+        }
         try {
             unregisterReceiver(connectivityReceiver);
         } catch (Exception ignored) {

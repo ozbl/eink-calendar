@@ -71,6 +71,13 @@ class StylePickerView extends View {
         setBackgroundColor(PAPER);
     }
 
+    /** Battery level drawn inside every thumbnail. */
+    void setBattery(int percent, boolean charging) {
+        preview.batteryPercent = percent;
+        preview.batteryCharging = charging;
+        invalidate();
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);

@@ -2,7 +2,9 @@ package com.zbl.einkcalendar;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Typeface;
+
 import android.text.TextUtils;
 
 import java.util.Calendar;
@@ -64,6 +66,9 @@ public class PosterRenderer {
     public String clock = "10:41";
     public String sync = "已校时";
     public String network = "已联网";
+    /** Battery percentage (0-100); negative hides the indicator. */
+    public int batteryPercent = -1;
+    public boolean batteryCharging = false;
     public String termLabel = "下一个节气";
     public String termName = "霜降";
     public String termDate = "10月23日";
@@ -205,6 +210,7 @@ public class PosterRenderer {
             case 14: l03(canvas); break;
             default: l04(canvas); break;
         }
+        drawBattery(canvas, style);
     }
 
     // ------------------------------------------------------------------
@@ -275,6 +281,73 @@ public class PosterRenderer {
         paint.setTypeface(bold ? boldType : regular);
         paint.setTextSize(px * S);
         return fx * W + paint.measureText(s);
+    }
+
+    /**
+     * Battery lives in the bottom-right corner on every layout, portrait and
+     * landscape alike, so the position stays predictable while flicking through
+     * the styles. Landscape uses its own baseline to stay inside layout 13's
+     * inset frame.
+     */
+    private void drawBattery(Canvas c, int style) {
+        if (batteryPercent < 0) {
+            return;
+        }
+        if (style >= FIRST_LANDSCAPE) {
+            battery(c, 0.945f, 0.940f);
+        } else {
+            battery(c, 0.950f, 0.965f);
+        }
+    }
+
+    private void battery(Canvas c, float fxRight, float fyBaseline) {
+        int level = Math.max(0, Math.min(100, batteryPercent));
+        String label = batteryPercent + "%";
+        float textSize = 32f * S;
+        paint.setTypeface(boldType);
+        paint.setTextSize(textSize);
+        paint.setTextAlign(Paint.Align.RIGHT);
+        paint.setColor(INK);
+        float baseline = fyBaseline * H;
+        float rightEdge = fxRight * W;
+        c.drawText(label, rightEdge, baseline, paint);
+        float textLeft = rightEdge - paint.measureText(label);
+
+        float bodyW = 38f * S;
+        float bodyH = 22f * S;
+        float right = textLeft - 12f * S;
+        float left = right - bodyW;
+        float top = baseline - 24f * S;
+        float bottom = top + bodyH;
+
+        line.setColor(INK);
+        line.setStyle(Paint.Style.STROKE);
+        line.setStrokeWidth(2f * S);
+        c.drawRect(left, top, right, bottom, line);
+
+        fill.setColor(INK);
+        fill.setStyle(Paint.Style.FILL);
+        // Positive terminal nub.
+        c.drawRect(right + 1f * S, top + bodyH * 0.30f,
+                right + 4f * S, bottom - bodyH * 0.30f, fill);
+
+        if (batteryCharging) {
+            float cx = (left + right) / 2f;
+            Path bolt = new Path();
+            bolt.moveTo(cx + 5f * S, top + 2f * S);
+            bolt.lineTo(cx - 7f * S, top + bodyH * 0.56f);
+            bolt.lineTo(cx - 1f * S, top + bodyH * 0.56f);
+            bolt.lineTo(cx - 5f * S, bottom - 2f * S);
+            bolt.lineTo(cx + 7f * S, top + bodyH * 0.44f);
+            bolt.lineTo(cx + 1f * S, top + bodyH * 0.44f);
+            bolt.close();
+            c.drawPath(bolt, fill);
+        } else {
+            float pad = 4f * S;
+            float innerW = bodyW - 2f * pad;
+            float filled = innerW * level / 100f;
+            c.drawRect(left + pad, top + pad, left + pad + filled, bottom - pad, fill);
+        }
     }
 
     // ------------------------------------------------------------------

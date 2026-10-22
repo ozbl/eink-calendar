@@ -81,6 +81,9 @@ final class DashboardView extends View {
     private String networkStatus = "离线";
     private String syncStatus = "本机时间";
 
+    private int batteryPercent = -1;
+    private boolean batteryCharging = false;
+
     static final int PAGE_POSTER = 0;
     static final int PAGE_CALENDAR = 1;
 
@@ -178,6 +181,16 @@ final class DashboardView extends View {
 
     void setSyncStatus(String status) {
         this.syncStatus = status;
+        invalidate();
+    }
+
+    /** Battery level shown on every layout; pass a negative percent to hide it. */
+    void setBattery(int percent, boolean charging) {
+        if (batteryPercent == percent && batteryCharging == charging) {
+            return;
+        }
+        batteryPercent = percent;
+        batteryCharging = charging;
         invalidate();
     }
 
@@ -606,7 +619,21 @@ final class DashboardView extends View {
     private void drawPoster(Canvas canvas, int w, int h) {
         poster.sync = syncStatus;
         poster.network = networkStatus;
+        poster.batteryPercent = batteryPercent;
+        poster.batteryCharging = batteryCharging;
         poster.draw(canvas, w, h, posterStyle);
+    }
+
+    /** "已校时 · 离线 · 82%" — battery tails the status line on the calendar page. */
+    private String statusLine() {
+        String line = syncStatus + " · " + networkStatus;
+        if (batteryPercent >= 0) {
+            line += " · " + batteryPercent + "%";
+            if (batteryCharging) {
+                line += " 充电中";
+            }
+        }
+        return line;
     }
 
     private void drawHeader(Canvas canvas, int w, int h) {
@@ -650,7 +677,7 @@ final class DashboardView extends View {
         paint.setTextSize(w * 0.030f);
         paint.setColor(SUBTLE);
         canvas.drawText(hClockSub, w - margin, h * 0.155f, paint);
-        canvas.drawText(syncStatus + " · " + networkStatus, w - margin, h * 0.195f, paint);
+        canvas.drawText(statusLine(), w - margin, h * 0.195f, paint);
         paint.setColor(INK);
         paint.setTextAlign(Paint.Align.LEFT);
 
@@ -867,7 +894,7 @@ final class DashboardView extends View {
         paint.setTypeface(Typeface.DEFAULT);
         paint.setTextSize(textSize);
         paint.setTextAlign(Paint.Align.RIGHT);
-        canvas.drawText(syncStatus + " · " + networkStatus, w - margin - 80f,
+        canvas.drawText(statusLine(), w - margin - 80f,
                 h * 0.062f, paint);
         paint.setTextAlign(Paint.Align.LEFT);
         paint.setColor(INK);

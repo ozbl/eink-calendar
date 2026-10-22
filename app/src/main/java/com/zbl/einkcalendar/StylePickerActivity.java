@@ -2,7 +2,10 @@ package com.zbl.einkcalendar;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.os.BatteryManager;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.view.View;
@@ -32,6 +35,17 @@ public class StylePickerActivity extends Activity implements StylePickerView.Lis
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         StylePickerView view = new StylePickerView(this, prefs.getInt("poster_style", 0), this);
         setContentView(view);
+        Intent battery = registerReceiver(null,
+                new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (battery != null) {
+            int level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            int scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+            int percent = (level >= 0 && scale > 0)
+                    ? Math.round(level * 100f / scale) : -1;
+            int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            view.setBattery(percent, status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL);
+        }
         String shotName = getIntent().getStringExtra("shot_name");
         if (shotName != null) {
             DebugShot.capture(view, shotName);
