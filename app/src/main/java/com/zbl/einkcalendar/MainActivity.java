@@ -171,6 +171,13 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         dashboard.setPosterStyle(style);
         setContentView(dashboard);
         applyKeepScreenOn();
+        String shotName = getIntent().getStringExtra("shot_name");
+        if (shotName != null) {
+            if ("calendar".equals(getIntent().getStringExtra("shot_page"))) {
+                dashboard.setPage(DashboardView.PAGE_CALENDAR);
+            }
+            DebugShot.capture(dashboard, shotName);
+        }
 
         // Refresh from cache first, then try the network.
         syncHolidays(false);

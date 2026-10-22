@@ -3,6 +3,20 @@
 一个为墨水屏阅读器（京东 JDRead / Onyx 代工，Android 4.4.2 / API 19）定制的
 **联网日历看板**：电子钟 + 公历日期 + 农历 + 干支 + 节气 + 节日 + 法定节假日/调休。
 
+## 界面截图
+
+| 月份牌（竖版 01） | 月历页（竖版） | 显示样式选择（竖版，第 1/3 页） |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01-poster-portrait.png" width="300" alt="月份牌 竖版"> | <img src="docs/screenshots/02-calendar-portrait.png" width="300" alt="月历页 竖版"> | <img src="docs/screenshots/05-style-picker-portrait.png" width="300" alt="样式选择 竖版"> |
+
+| 月份牌（横版 13） | 月历页（横版） | 显示样式选择（横版，第 3/3 页） |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/03-poster-landscape.png" width="300" alt="月份牌 横版"> | <img src="docs/screenshots/04-calendar-landscape.png" width="300" alt="月历页 横版"> | <img src="docs/screenshots/06-style-picker-landscape.png" width="300" alt="样式选择 横版"> |
+
+> 截图由 debug 构建的 `DebugShot` 直接把 View 渲染成 PNG，绕开墨水屏面板，
+> 因此没有残影，也不受整机转向影响（横版即 1448×1072）。生成方式见
+> `app/src/main/java/com/zbl/einkcalendar/DebugShot.java` 的类注释。
+
 ## 功能
 
 - **两页上下滑动**：默认是「月份牌」大字页，任一竖向滑动切到月历页，再竖向滑动（或按返回键）回到月份牌。
@@ -162,6 +176,7 @@ app/src/main/java/com/zbl/einkcalendar/
   HolidayStore.java    节假日拉取/解析/按年缓存（含 API 19 TLS 1.2 补丁）
   TimeSync.java        HTTP Date 校时与偏差持久化
   MainActivity.java    生命周期、分钟 ticker、网络广播、设置对话框
+  DebugShot.java       debug 构建的截图导出（View → PNG），运行时无副作用
 tools/
   LunarSolarConverter.java  农历表来源（参考，不打包）
   LunarTest*.java           算法自测

@@ -32,6 +32,10 @@ public class StylePickerActivity extends Activity implements StylePickerView.Lis
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         StylePickerView view = new StylePickerView(this, prefs.getInt("poster_style", 0), this);
         setContentView(view);
+        String shotName = getIntent().getStringExtra("shot_name");
+        if (shotName != null) {
+            DebugShot.capture(view, shotName);
+        }
     }
 
     @Override
