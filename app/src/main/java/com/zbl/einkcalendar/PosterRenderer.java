@@ -300,24 +300,17 @@ public class PosterRenderer {
         }
     }
 
+    /**
+     * Battery icon with the level set inside the outline, no percent sign.
+     * While charging a bolt is drawn just outside the shell, to the left.
+     */
     private void battery(Canvas c, float fxRight, float fyBaseline) {
         int level = Math.max(0, Math.min(100, batteryPercent));
-        String label = batteryPercent + "%";
-        float textSize = 32f * S;
-        paint.setTypeface(boldType);
-        paint.setTextSize(textSize);
-        paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setColor(INK);
-        float baseline = fyBaseline * H;
-        float rightEdge = fxRight * W;
-        c.drawText(label, rightEdge, baseline, paint);
-        float textLeft = rightEdge - paint.measureText(label);
-
         float bodyW = 38f * S;
         float bodyH = 22f * S;
-        float right = textLeft - 12f * S;
+        float right = fxRight * W;
         float left = right - bodyW;
-        float top = baseline - 24f * S;
+        float top = fyBaseline * H - 24f * S;
         float bottom = top + bodyH;
 
         line.setColor(INK);
@@ -331,22 +324,32 @@ public class PosterRenderer {
         c.drawRect(right + 1f * S, top + bodyH * 0.30f,
                 right + 4f * S, bottom - bodyH * 0.30f, fill);
 
+        // Level inside the shell. 17px is the largest size that keeps "100"
+        // clear of the outline.
+        paint.setTypeface(boldType);
+        paint.setTextSize(17f * S);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setColor(INK);
+        Paint.FontMetrics fm = paint.getFontMetrics();
+        float textBaseline = (top + bottom) / 2f - (fm.ascent + fm.descent) / 2f;
+        c.drawText(String.valueOf(level), (left + right) / 2f, textBaseline, paint);
+
         if (batteryCharging) {
-            float cx = (left + right) / 2f;
+            float boltW = 15f * S;
+            float boltH = 22f * S;
+            float boltRight = left - 6f * S;
+            float boltLeft = boltRight - boltW;
+            float boltTop = (top + bottom - boltH) / 2f;
+            float cx = (boltLeft + boltRight) / 2f;
             Path bolt = new Path();
-            bolt.moveTo(cx + 5f * S, top + 2f * S);
-            bolt.lineTo(cx - 7f * S, top + bodyH * 0.56f);
-            bolt.lineTo(cx - 1f * S, top + bodyH * 0.56f);
-            bolt.lineTo(cx - 5f * S, bottom - 2f * S);
-            bolt.lineTo(cx + 7f * S, top + bodyH * 0.44f);
-            bolt.lineTo(cx + 1f * S, top + bodyH * 0.44f);
+            bolt.moveTo(cx + 5f * S, boltTop);
+            bolt.lineTo(cx - 7f * S, boltTop + boltH * 0.56f);
+            bolt.lineTo(cx - 1f * S, boltTop + boltH * 0.56f);
+            bolt.lineTo(cx - 5f * S, boltTop + boltH);
+            bolt.lineTo(cx + 7f * S, boltTop + boltH * 0.44f);
+            bolt.lineTo(cx + 1f * S, boltTop + boltH * 0.44f);
             bolt.close();
             c.drawPath(bolt, fill);
-        } else {
-            float pad = 4f * S;
-            float innerW = bodyW - 2f * pad;
-            float filled = innerW * level / 100f;
-            c.drawRect(left + pad, top + pad, left + pad + filled, bottom - pad, fill);
         }
     }
 
