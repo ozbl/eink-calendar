@@ -43,6 +43,8 @@ public class MainActivity extends Activity implements DashboardView.Listener {
 
     private final Handler handler = new Handler();
     private boolean running;
+    /** Only the first resume after launch gets the clean-up flash. */
+    private boolean firstResume = true;
     /**
      * A window flag alone is not enough on this reader: its power service
      * still follows the system "sleep after 30 min" timer, so a real screen
@@ -170,7 +172,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                         @Override
                         public void run() {
                             if (running && dashboard != null) {
-                                dashboard.softRefresh();
+                                // Repaint without flashing: ghosting is cleared
+                                // on the hour, not whenever the vendor wakes us.
+                                dashboard.invalidate();
                             }
                         }
                     }, 800L);
@@ -247,7 +251,15 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         applyOrientationFor(prefs.getInt("poster_style", 0));
         dashboard.setPosterStyle(prefs.getInt("poster_style", 0));
         dashboard.updateNow(TimeSync.now());
-        dashboard.softRefresh();
+        if (firstResume) {
+            firstResume = false;
+            dashboard.softRefresh();
+        } else {
+            // A system overlay (root prompt, USB dialog, vendor standby) can
+            // pause and resume us at any time.  Repaint quietly instead of
+            // flashing: the hourly flush is the one scheduled clean-up.
+            dashboard.invalidate();
+        }
         syncHolidays(false);
         maybeSyncTime(false);
     }
