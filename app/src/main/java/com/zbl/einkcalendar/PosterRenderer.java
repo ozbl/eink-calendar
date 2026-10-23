@@ -69,6 +69,8 @@ public class PosterRenderer {
     /** Battery percentage (0-100); negative hides the indicator. */
     public int batteryPercent = -1;
     public boolean batteryCharging = false;
+    /** Compact forecast line, e.g. "今日天气 多云 9~17℃"; empty hides it. */
+    public String weather = "";
     public String termLabel = "下一个节气";
     public String termName = "霜降";
     public String termDate = "10月23日";
@@ -211,6 +213,7 @@ public class PosterRenderer {
             default: l04(canvas); break;
         }
         drawBattery(canvas, style);
+        drawWeather(canvas, style);
     }
 
     // ------------------------------------------------------------------
@@ -298,6 +301,19 @@ public class PosterRenderer {
         } else {
             battery(c, 0.950f, 0.965f);
         }
+    }
+
+    /**
+     * Weather shares the bottom edge with the battery: on the left in both
+     * orientations, so every one of the sixteen layouts gets it at the same
+     * predictable spot without touching the individual compositions.
+     */
+    private void drawWeather(Canvas c, int style) {
+        if (weather == null || weather.length() == 0) {
+            return;
+        }
+        float baseline = style >= FIRST_LANDSCAPE ? 0.945f : 0.965f;
+        left(c, weather, 0.05f, baseline, 32, GRAY, false);
     }
 
     /**

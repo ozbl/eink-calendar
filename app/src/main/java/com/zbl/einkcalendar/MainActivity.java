@@ -23,6 +23,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -39,6 +40,7 @@ public class MainActivity extends Activity implements DashboardView.Listener {
 
     private SharedPreferences prefs;
     private HolidayStore holidays;
+    private WeatherStore weather;
     private DashboardView dashboard;
 
     private final Handler handler = new Handler();
@@ -87,6 +89,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
             }
             dashboard.updateNow(TimeSync.now());
             maybeSyncTime(false);
+            if (weather != null && weather.stale()) {
+                weather.sync(false, weatherListener);
+            }
             if (HolidayStore.hasNetwork(MainActivity.this)
                     && !holidays.hasData(currentYear())
                     && System.currentTimeMillis() - lastHolidayAttempt > 60000L) {
@@ -106,6 +111,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                 dashboard.setNetworkStatus("已联网");
                 syncHolidays(false);
                 maybeSyncTime(true);
+                if (weather != null && weather.stale()) {
+                    weather.sync(false, weatherListener);
+                }
             } else {
                 dashboard.setNetworkStatus("离线");
             }
@@ -133,6 +141,25 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                 || status == BatteryManager.BATTERY_STATUS_FULL;
         dashboard.setBattery(percent, charging);
     }
+
+    /** Pushes the cached/fresh forecast into the dashboard. */
+    private void applyWeather() {
+        if (dashboard == null || weather == null) {
+            return;
+        }
+        String brief = weather.todayShort();
+        dashboard.setWeather(
+                weather.todayLine(),
+                weather.tomorrowLine(),
+                brief.length() == 0 ? "" : "今日天气  " + brief);
+    }
+
+    private final WeatherStore.Listener weatherListener = new WeatherStore.Listener() {
+        @Override
+        public void onWeather(boolean ok, String message) {
+            applyWeather();
+        }
+    };
 
     /**
      * Last line of defence: some vendor power services switch the panel off
@@ -204,6 +231,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         holidays.loadCached(year);
         holidays.loadCached(year + 1);
 
+        weather = new WeatherStore(this);
+        weather.loadCached();
+
         dashboard = new DashboardView(this, this, holidays);
         dashboard.setNetworkStatus(HolidayStore.hasNetwork(this) ? "已联网" : "离线");
         dashboard.setSyncStatus(TimeSync.isSynced() ? "已校时" : "本机时间");
@@ -216,6 +246,7 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         applyOrientationFor(style);
         dashboard.setPosterStyle(style);
         setContentView(dashboard);
+        applyWeather();
         applyKeepScreenOn();
         String shotName = getIntent().getStringExtra("shot_name");
         if (shotName != null) {
@@ -228,6 +259,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         // Refresh from cache first, then try the network.
         syncHolidays(false);
         maybeSyncTime(true);
+        if (weather.stale()) {
+            weather.sync(false, weatherListener);
+        }
     }
 
     @Override
@@ -262,6 +296,9 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         }
         syncHolidays(false);
         maybeSyncTime(false);
+        if (weather.stale()) {
+            weather.sync(false, weatherListener);
+        }
     }
 
     @Override
@@ -488,6 +525,32 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         });
         root.addView(holidayRow);
 
+        TextView cityRow = row("天气城市：" + weather.city());
+        cityRow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+                showWeatherCityDialog();
+            }
+        });
+        root.addView(cityRow);
+
+        TextView weatherRow = row("更新天气（中国天气网）");
+        weatherRow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toast("正在获取天气…");
+                weather.sync(true, new WeatherStore.Listener() {
+                    @Override
+                    public void onWeather(boolean ok, String message) {
+                        applyWeather();
+                        toast(message);
+                    }
+                });
+            }
+        });
+        root.addView(weatherRow);
+
         TextView flushRow = row("立即全屏刷新（清除残影）");
         flushRow.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -504,8 +567,8 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         root.addView(flushRow);
 
         TextView info = new TextView(this);
-        info.setText("数据源：timor.tech（节假日）· HTTP Date（校时）\n"
-                + "农历/节气/干支：内置离线算法（1888-2100）\n"
+        info.setText("数据源：timor.tech（节假日）· weather.com.cn（天气）\n"
+                + "HTTP Date（校时）· 农历/节气/干支：内置离线算法（1888-2100）\n"
                 + "当前："
                 + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
                 .format(new Date(TimeSync.now())));
@@ -539,6 +602,118 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                     ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         dialog.show();
+    }
+
+    /** City chooser: type any name, or tap one of the common cities. */
+    private void showWeatherCityDialog() {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.WHITE);
+        int pad = dp(24);
+        root.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("天气城市");
+        title.setTextColor(Color.BLACK);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        title.setPadding(0, 0, 0, dp(12));
+        root.addView(title);
+
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(weather.city());
+        input.setHint("输入城市名，如：杭州");
+        input.setTextColor(Color.BLACK);
+        input.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        input.setPadding(dp(12), dp(8), dp(12), dp(8));
+        root.addView(input);
+
+        TextView save = row("保存并更新");
+        save.setGravity(Gravity.CENTER);
+        save.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String name = input.getText().toString().trim();
+                if (name.length() == 0) {
+                    toast("请输入城市名");
+                    return;
+                }
+                dialog.dismiss();
+                setWeatherCity(name);
+            }
+        });
+        root.addView(save);
+
+        TextView listTitle = new TextView(this);
+        listTitle.setText("常用城市");
+        listTitle.setTextColor(0xFF555555);
+        listTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        listTitle.setPadding(dp(4), dp(14), 0, dp(2));
+        root.addView(listTitle);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < WeatherStore.CITIES.length; i++) {
+            final String city = WeatherStore.CITIES[i];
+            TextView item = row(city);
+            item.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    dialog.dismiss();
+                    setWeatherCity(city);
+                }
+            });
+            list.addView(item);
+        }
+        scroll.addView(list);
+        root.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(360)));
+
+        TextView cancel = row("取消");
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        root.addView(cancel);
+
+        GradientDrawable panel = new GradientDrawable();
+        panel.setColor(Color.WHITE);
+        panel.setStroke(dp(3), Color.BLACK);
+        panel.setCornerRadius(dp(8));
+        ScrollView outer = new ScrollView(this);
+        outer.setBackground(panel);
+        outer.addView(root);
+        dialog.setContentView(outer);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.WHITE));
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.86f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            // Keep the keyboard down until the user taps the input: the city
+            // list is the primary control on an e-ink device.
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+        }
+        dialog.show();
+    }
+
+    private void setWeatherCity(final String name) {
+        weather.setCity(name);
+        applyWeather();
+        toast("正在获取 " + name + " 天气…");
+        weather.sync(true, new WeatherStore.Listener() {
+            @Override
+            public void onWeather(boolean ok, String message) {
+                applyWeather();
+                toast(message);
+            }
+        });
     }
 
     private boolean isKeepScreenOn() {

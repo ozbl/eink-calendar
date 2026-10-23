@@ -84,6 +84,11 @@ final class DashboardView extends View {
     private int batteryPercent = -1;
     private boolean batteryCharging = false;
 
+    // Weather lines filled by WeatherStore; empty strings hide the block.
+    private String weatherToday = "";
+    private String weatherTomorrow = "";
+    private String weatherShort = "";
+
     static final int PAGE_POSTER = 0;
     static final int PAGE_CALENDAR = 1;
 
@@ -191,6 +196,25 @@ final class DashboardView extends View {
         }
         batteryPercent = percent;
         batteryCharging = charging;
+        invalidate();
+    }
+
+    /**
+     * Sets the forecast shown on both pages.  todayLine is "今天 多云 9~17℃",
+     * tomorrowLine is "明天 小雨 11~17℃", shortLine is the footer form
+     * "今日天气 多云 9~17℃".  Empty strings hide the corresponding lines.
+     */
+    void setWeather(String todayLine, String tomorrowLine, String shortLine) {
+        String today = todayLine == null ? "" : todayLine;
+        String tomorrow = tomorrowLine == null ? "" : tomorrowLine;
+        String brief = shortLine == null ? "" : shortLine;
+        if (today.equals(weatherToday) && tomorrow.equals(weatherTomorrow)
+                && brief.equals(weatherShort)) {
+            return;
+        }
+        weatherToday = today;
+        weatherTomorrow = tomorrow;
+        weatherShort = brief;
         invalidate();
     }
 
@@ -621,6 +645,7 @@ final class DashboardView extends View {
         poster.network = networkStatus;
         poster.batteryPercent = batteryPercent;
         poster.batteryCharging = batteryCharging;
+        poster.weather = weatherShort;
         poster.draw(canvas, w, h, posterStyle);
     }
 
@@ -850,9 +875,26 @@ final class DashboardView extends View {
         paint.setTextSize(w * 0.030f);
         canvas.drawText(dLunarGanzhi, leftX, gridBottom + 92f, paint);
         canvas.drawText(dTerm, leftX, gridBottom + 138f, paint);
-        canvas.drawText(dFestival, leftX, gridBottom + 184f, paint);
-        paint.setColor(SUBTLE);
-        canvas.drawText(dHoliday, leftX, gridBottom + 230f, paint);
+        if (weatherToday.length() > 0) {
+            // Give the forecast a row: merge the festival/holiday lines and use
+            // the freed line for "今天 … · 明天 …".
+            String rest = dFestival;
+            if (dHoliday.length() > 0) {
+                rest = rest.length() == 0 ? dHoliday : rest + " · " + dHoliday;
+            }
+            paint.setColor(SUBTLE);
+            canvas.drawText(rest, leftX, gridBottom + 184f, paint);
+            String line = "天气  " + weatherToday;
+            if (weatherTomorrow.length() > 0) {
+                line += " · " + weatherTomorrow;
+            }
+            paint.setColor(INK);
+            canvas.drawText(line, leftX, gridBottom + 230f, paint);
+        } else {
+            canvas.drawText(dFestival, leftX, gridBottom + 184f, paint);
+            paint.setColor(SUBTLE);
+            canvas.drawText(dHoliday, leftX, gridBottom + 230f, paint);
+        }
 
         float rightX = w * 0.52f;
         paint.setColor(INK);
@@ -987,13 +1029,24 @@ final class DashboardView extends View {
         paint.setColor(INK);
         paint.setTypeface(Typeface.DEFAULT_BOLD);
         paint.setTextSize(w * 0.023f);
-        canvas.drawText(dTitle, leftX, h * 0.790f, paint);
+        float titleY = weatherToday.length() > 0 ? 0.780f : 0.790f;
+        float lunarY = weatherToday.length() > 0 ? 0.818f : 0.833f;
+        float termY = weatherToday.length() > 0 ? 0.856f : 0.876f;
+        float festY = weatherToday.length() > 0 ? 0.894f : 0.919f;
+        canvas.drawText(dTitle, leftX, h * titleY, paint);
 
         paint.setTypeface(Typeface.DEFAULT);
         paint.setTextSize(w * 0.022f);
-        canvas.drawText(dLunarGanzhi, leftX, h * 0.833f, paint);
-        canvas.drawText(dTerm, leftX, h * 0.876f, paint);
-        canvas.drawText(dFestival + " · " + dHoliday, leftX, h * 0.919f, paint);
+        canvas.drawText(dLunarGanzhi, leftX, h * lunarY, paint);
+        canvas.drawText(dTerm, leftX, h * termY, paint);
+        canvas.drawText(dFestival + " · " + dHoliday, leftX, h * festY, paint);
+        if (weatherToday.length() > 0) {
+            paint.setColor(INK);
+            canvas.drawText(weatherToday, leftX, h * 0.933f, paint);
+            if (weatherTomorrow.length() > 0) {
+                canvas.drawText(weatherTomorrow, leftX, h * 0.972f, paint);
+            }
+        }
 
         paint.setColor(GRAY);
         paint.setTextSize(w * 0.022f);
