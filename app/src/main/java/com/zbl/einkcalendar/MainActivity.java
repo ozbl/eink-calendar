@@ -29,6 +29,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -52,10 +53,29 @@ public class MainActivity extends Activity implements DashboardView.Listener {
     private long wakeWindowStart = 0L;
     private int wakeAttempts = 0;
     private long lastHolidayAttempt = 0L;
-    private long lastFlush = 0L;
 
-    /** Clear accumulated e-ink ghosting on a quiet dashboard. */
-    private static final long AUTO_FLUSH_MS = 30L * 60L * 1000L;
+    /** Clears accumulated e-ink ghosting once an hour, exactly on the hour. */
+    private final Runnable hourlyFlush = new Runnable() {
+        @Override
+        public void run() {
+            if (!running) {
+                return;
+            }
+            dashboard.softRefresh();
+            handler.postDelayed(this, delayToNextHour());
+        }
+    };
+
+    /** Milliseconds from now to the next full hour. */
+    private static long delayToNextHour() {
+        Calendar cal = Calendar.getInstance();
+        long now = cal.getTimeInMillis();
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.add(Calendar.HOUR_OF_DAY, 1);
+        return cal.getTimeInMillis() - now;
+    }
 
     private final Runnable ticker = new Runnable() {
         @Override
@@ -70,11 +90,10 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                     && System.currentTimeMillis() - lastHolidayAttempt > 60000L) {
                 syncHolidays(false);
             }
-            if (System.currentTimeMillis() - lastFlush > AUTO_FLUSH_MS) {
-                lastFlush = System.currentTimeMillis();
-                dashboard.softRefresh();
-            }
-            handler.postDelayed(this, 10000L);
+            // Wake up just after the next minute boundary instead of polling
+            // every ten seconds; the clock still flips on the minute.
+            handler.postDelayed(this,
+                    60000L - (System.currentTimeMillis() % 60000L) + 1000L);
         }
     };
 
@@ -212,6 +231,8 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         super.onResume();
         running = true;
         handler.post(ticker);
+        handler.removeCallbacks(hourlyFlush);
+        handler.postDelayed(hourlyFlush, delayToNextHour());
         IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(connectivityReceiver, filter);
         registerReceiver(batteryReceiver,
@@ -227,7 +248,6 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         dashboard.setPosterStyle(prefs.getInt("poster_style", 0));
         dashboard.updateNow(TimeSync.now());
         dashboard.softRefresh();
-        lastFlush = System.currentTimeMillis();
         syncHolidays(false);
         maybeSyncTime(false);
     }
@@ -237,6 +257,7 @@ public class MainActivity extends Activity implements DashboardView.Listener {
         super.onPause();
         running = false;
         handler.removeCallbacks(ticker);
+        handler.removeCallbacks(hourlyFlush);
         if (screenReceiverRegistered) {
             try {
                 unregisterReceiver(screenReceiver);
@@ -464,7 +485,6 @@ public class MainActivity extends Activity implements DashboardView.Listener {
                     @Override
                     public void run() {
                         dashboard.fullRefresh();
-                        lastFlush = System.currentTimeMillis();
                     }
                 }, 260L);
             }
